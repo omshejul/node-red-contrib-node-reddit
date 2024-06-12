@@ -1,0 +1,1387 @@
+<!-- START Config Node -->
+<script type="text/x-red" data-template-name="reddit-credentials">
+    <div class="form-row">
+        <label for="node-config-input-name"><i class="fa fa-tag"></i> <span> name</span></label>
+        <input type="text" id="node-config-input-name">
+    </div>
+    <hr>
+    <div class="form-row">
+        <label for="node-config-input-client_id"><i class="fa fa-tag"></i> <span> client ID</span></label>
+        <input type="text" id="node-config-input-client_id">
+    </div>
+    <div class="form-row">
+        <label for="node-config-input-client_secret"><i class="fa fa-key"></i> <span> client secret</span></label>
+        <input type="text" id="node-config-input-client_secret">
+    </div>
+    <div class="form-row">
+        <label for="node-config-input-user_agent"><i class="fa fa-tag"></i> <span> user agent</span></label>
+        <input type="text" id="node-config-input-user_agent">
+    </div>
+    <div class="form-row" id="node-action-auth_type"> 
+        <label for="node-config-input-auth_type"><i class="fa fa-wrench"></i> authentication</label>
+        <select type="text" id="node-config-input-auth_type" style="display: inline-block; width: 250px; vertical-align: top;">
+            <option value="username_password" outputs="1">username/password</option>
+            <option value="refresh_token" outputs="1">refresh token</option>
+            <option value="access_token" outputs="1">access token</option>
+        </select>
+    </div>
+    <div class="form-row" id="node-action-username">
+        <label for="node-config-input-username"><i class="fa fa-tag"></i> <span> username</span></label>
+            <input type="text" id="node-config-input-username">
+    </div>
+    <div class="form-row" id="node-action-password">
+        <label for="node-config-input-password"><i class="fa fa-key"></i> <span> password</span></label>
+        <input type="password" id="node-config-input-password">
+    </div>
+    <div class="form-row" id="node-action-refresh_token">
+        <label for="node-config-input-refresh_token"><i class="fa fa-key"></i> <span> refresh Token</span></label>
+        <input type="text" id="node-config-input-refresh_token">
+    </div>
+    <div class="form-row" id="node-action-access_token">
+        <label for="node-config-input-access_token"><i class="fa fa-key"></i> <span> access Token</span></label>
+        <input type="text" id="node-config-input-access_token">
+    </div>
+</script>
+
+<script type="text/javascript">
+    function oneditprepare() {
+        function hideExtraActions(){
+            $("#node-action-username").hide();
+            $("#node-action-password").hide();
+            $("#node-action-refresh_token").hide();
+            $("#node-action-access_token").hide();
+        }
+
+        function showActions(){
+            var auth_type = $("#node-config-input-auth_type option:selected").val();
+            if (auth_type == "username_password") {
+                $("#node-action-username").show();
+                $("#node-action-password").show();
+            }
+            else if (auth_type == "refresh_token"){
+                $("#node-action-refresh_token").show();
+            } 
+            else if (auth_type == "access_token"){
+                $("#node-action-access_token").show();
+            } 
+        }
+
+        $("#node-config-input-auth_type").change(function() {
+            hideExtraActions()
+            showActions()
+        });
+
+        hideExtraActions()
+        showActions()
+    }
+
+
+    RED.nodes.registerType('reddit-credentials',{
+      defaults: {
+        username: {value:"", required: false},
+        user_agent: {value:"", required: true},
+        auth_type:  {value:"username_password", required: false},
+        name: {value:"", required: false}
+        },
+      category: 'config',
+      credentials: {
+        password: {type: "password", required: false},
+        client_id: {type: "password", required: true},
+        client_secret: {type: "password", required: true},
+        refresh_token: {type:"password", required: false},
+        access_token: {type:"password", required: false}
+      },
+      label: function() {
+        return this.name || this.username;
+      },
+      exportable: false,
+      icon: "snoo2.png",
+      color:"#ffa27f",
+      oneditprepare: oneditprepare
+    });
+</script>
+
+<script type="text/x-red" data-help-name="reddit-credentials">
+    <p>Authentication for the Reddit API</p>
+    <p>To create a Reddit app and obtain its Client ID and Client Secret, log in to your Reddit account and visit <a href="https://ssl.reddit.com/prefs/apps/">this link.</a></p>
+    <p>There are 3 ways to provide authentication:</p>
+    <ol>
+        <li><i>Username/password</i>: For long-term access. Possible for script-type apps only.</li>
+        <li><i>Refresh token</i>: For long-term access. Visit <a href="https://not-an-aardvark.github.io/reddit-oauth-helper/">here</a> to generate a token.</li>
+        <li><i>Access token</i>: For short-term access. Expires in one hour. Visit <a href="https://not-an-aardvark.github.io/reddit-oauth-helper/">here</a> to generate a token.</li>
+    </ol>
+    <h3>References</h3>
+    <ul>
+        <li><a href="https://github.com/reddit-archive/reddit/wiki/oauth2">Reddit OAuth2 docs</a> - full description of authtication methods</li>
+        <li><a href="https://not-an-aardvark.github.io/snoowrap/snoowrap.html">Snoowrap docs</a> - guidelines for creating Snoowrap objects</li>
+    </ul>
+</script>
+<!-- END Config Node -->
+
+<!-- START Stream -->
+<script type="text/javascript">
+    RED.nodes.registerType('stream', {
+      category: 'reddit',
+      color: '#a6bbcf',
+      defaults: {
+        name: {value: ""},
+        reddit: {type: "reddit-credentials", required: true},
+        kind: {value: "", required: true},
+        subreddit: {value: ""},
+        filter: {value: "inbox"},
+        markedAsRead: {},
+        timeout: {value: ""},
+        pollTime: {value: ""}
+      },
+      inputs: 0,
+      outputs: 1,
+      icon: "snoo2.png",
+      color:"#ffa27f",
+      label: function() {
+        let creds = RED.nodes.node(this.reddit);
+        if (this.name) {
+          return this.name;
+        } else if (this.kind === "PMs") {
+          return creds ? "u/" + creds.username : "PM stream";
+        } else if (this.subreddit) {
+          return "r/" + this.subreddit;
+        } else {
+          return "stream";
+        }
+      },
+      oneditprepare: () => {
+        $("#node-input-markedAsRead").prop("disabled", true);
+  
+        $("#node-input-kind").change(() => {
+          $("#node-action-subreddit").hide();
+          $("#node-action-filter").hide();
+          $("#node-action-markedAsRead").hide();
+    
+          let type = $("#node-input-kind option:selected").val();
+          
+          if (type === "submissions" || type === "comments") {
+            $("#node-action-subreddit").show();
+          } else if (type === "PMs") {
+            $("#node-action-filter").show();
+            $("#node-action-markedAsRead").show();
+          }
+        });
+  
+        $("#node-input-filter").change(() => {
+          $("#node-input-markedAsRead").prop("disabled", true);
+          if ($("#node-input-filter").val() === "unread") {
+            $("#node-input-markedAsRead").prop("disabled", false);
+          }
+        });
+      }
+    });
+  </script>
+    
+  <script type="text/x-red" data-template-name="stream">
+    <div class="form-row">
+      <label for="node-input-reddit"><i class="fa fa-reddit"></i> credentials</label>
+      <input type="text" id="node-input-reddit">
+    </div>
+    <div class="form-row">
+      <label for="node-input-name"><i class="icon-tag"></i> name</label>
+      <input type="text" id="node-input-name" placeholder="optional name for this node">
+    </div>
+    <hr>
+    <div class="form-row"> 
+      <label for="node-input-kind"><i class="fa fa-wrench"></i> stream</label>
+      <select type="text" id="node-input-kind" style="display: inline-block; width: 250px; vertical-align: top;">
+        <option value="submissions" outputs="1">submissions</option>                            
+        <option value="comments" outputs="1">comments</option>
+        <option value="PMs" outputs="1">private messages</option>
+      </select>
+    </div>
+    <div class="form-row" id="node-action-subreddit">
+      <label for="node-input-subreddit"><i class="icon-tag"></i> subreddit</label>
+      <input type="text" id="node-input-subreddit" placeholder="subreddit name">
+    </div>
+    <div class="form-row" id="node-action-filter">
+      <label for="node-input-filter"><i class="fa fa-wrench"></i> filter</label>
+      <select type="text" id="node-input-filter" style="display: inline-block; width: 250px; vertical-align: top;">
+        <option value="inbox" outputs="1">inbox</option>
+        <option value="unread" outputs="1">unread</option>
+        <option value="messages" outputs="1">messages</option>
+        <option value="comments" outputs="1">comments</option>
+        <option value="selfreply" outputs="1">selfreply</option>
+        <option value="mentions" outputs="1">mentions</option>
+      </select>
+    </div>
+    <div class="form-row" id="node-action-markedAsRead">
+      <label for="node-input-markedAsRead" style="width:auto"><i class="icon-tag"></i> mark as read</label>
+      <input type="checkbox" id="node-input-markedAsRead" style="width:23px">
+    </div>
+    <div class="form-row">
+      <label for="node-input-pollTime"><i class="icon-tag"></i> polltime (s)</label>
+      <input type="number" id="node-input-pollTime" min="2" max="3600" step="any" placeholder="optional refresh rate">
+    </div>
+    <div class="form-row">
+      <label for="node-input-timeout"><i class="icon-tag"></i> timeout (s)</label>
+      <input type="number" id="node-input-timeout" min="1" placeholder="optional timeout in seconds">
+    </div>
+  </script>
+    
+  <script type="text/x-red" data-help-name="stream">
+    <p>Stream submissions and comments from a subreddit or PMs from your inbox.</p>
+      
+    <h3>Inputs</h3>
+      <dl class="message-properties">
+        <dt>stream <span class="property-type">selection</span></dt>
+        <dd> choose comments, submissions, or PMs.</dd>
+        <dt>subreddit <span class="property-type">string</span></dt>
+        <dd> the subreddit to stream (unused for PMs).</dd>
+        <dt>filter <span class="property-type">selection</span></dt>
+        <dd> choose which type of messages to stream from Inbox</dd>
+        <dt class="optional">mark as read <span class="property-type">checkbox</span></dt>
+        <dt class="optional">polltime <span class="property-type">number</span></dt>
+        <dd> the refresh rate in seconds.</dd>
+        <dt class="optional">timeout <span class="property-type">number</span></dt>
+        <dd> the length of time to stream in seconds.</dd>
+      </dl>
+  
+    <h3>Outputs</h3>
+      <ol class="node-ports">
+        <li>Standard output
+          <dl class="message-properties">
+            <dt>payload <span class="property-type">object</span></dt>
+            <dd> details of the comment, submission, or PM.</dd>
+          </dl>
+        </li>
+        <li>Standard error
+          <dl class="message-properties">
+            <dt>payload <span class="property-type">string</span></dt>
+            <dd>the standard error of the command.</dd>
+           </dl>
+        </li>
+      </ol>
+  
+    <h3>Details</h3>
+      <p>Exclude the "r/" when entering your <code>subreddit</code>. "r/<code>subreddit</code>" will be 
+      used for the display name if <code>name</code> is left empty.
+      </p>
+      <p>"u/<code>credentials.username</code>" will be used for the display name if <code>name</code> is left empty.
+      </p>
+      <p>The <code>polltime</code> is the number of seconds (between 2 and 3600) that the stream polls for updates.
+         Reddit enforces a ratelimit of 30 polls per minute. If your stream continues to hit the ratelimit, consider
+         increasing the <code>polltime</code>.
+      </p>
+      <p>The <code>timeout</code> will stop the stream after the desired number of seconds.
+      If left blank, the stream will continue until the node is deleted from the flow, an error is thrown,
+      or node-RED is shutdown.
+      </p>
+  
+    <h3>References</h3>
+      <ul>
+        <li><a href='https://www.reddit.com/dev/api/'>Reddit API docs</a> - descriptions of comment and submission listings</li>
+        <li><a href='https://github.com/jcostello93/node-red-contrib-node-reddit'>node-red-contrib-node-reddit</a> - the Node-Reddit github repository</li>
+      </ul>
+  </script>
+  <!-- END Stream -->
+
+
+<!-- START Get -->
+<script type="text/javascript">
+    function oneditprepare() {
+        function resetFetchAll() {
+            var type = $("#node-input-content_type option:selected").val();
+            var current_source_identifier = "#node-input-" + type + "_source option:selected";
+            var current_source = $(current_source_identifier).val();
+
+            // A user can get all submissions/replies from a user and all contents of their inbox
+            if (current_source == "user" || current_source == "inbox") {
+                return
+            }
+            
+            // A user can expand all replies for a submission
+            if (type == "comment" && $("#node-input-comment_source option:selected").val() == "submission") {
+                return 
+            }
+
+            // In every other case, fetch_all is set to false
+            $("#node-input-fetch_all").val("false");
+        }
+
+
+        function hideExtraActions(){
+            $("#node-action-submission_source").hide();
+            $("#node-action-comment_source").hide();
+            $("#node-action-pm_source").hide();
+            $("#node-action-content_source").hide();
+            $("#node-action-subreddit").hide();
+            $("#node-action-user").hide();
+            $("#node-action-sort").hide();
+            $("#node-action-time").hide();
+            $("#node-action-limit").hide();
+            $("#node-action-fetch_all").hide();
+            $("#node-action-content_id").hide();
+            $("#node-action-depth").hide();
+        }
+
+        function showActions() { 
+            // 1. type
+            // 2. source
+            // 3. subreddit
+            // 4. user
+            // 5. sort
+            // 6. time
+            // 7. fetch all
+            // 8. limit
+
+            var type = $("#node-input-content_type option:selected").val();
+            var submission_source = $("#node-input-submission_source option:selected").val();
+            var comment_source = $("#node-input-comment_source option:selected").val();
+            var pm_source = $("#node-input-pm_source option:selected").val();
+            var current_source_identifier = "#node-input-" + type + "_source option:selected";
+            var current_source = $(current_source_identifier).val();
+
+            var sort = $("#node-input-sort option:selected").val();
+            
+            if (type == "submission") {
+                if (current_source == "subreddit") {
+                    $("#node-action-subreddit").show();
+                    if (sort == "top" || sort == "controversial") {
+                        $("#node-action-time").show();
+                    }
+
+                    $("#node-action-sort").show();
+                }
+                else if (current_source == "user") {
+                    $("#node-action-user").show();
+                    $("#node-action-sort").show();
+                    $("#node-action-fetch_all").show();
+                }
+                else if (current_source == "id") {
+                    $("#node-action-content_id").show();
+                }
+                $("#node-action-submission_source").show()
+
+            }
+            else if (type == "comment") {
+                if (current_source == "subreddit") {
+                    $("#node-action-subreddit").show();
+                }
+                else if (current_source == "user") {
+                    $("#node-action-user").show();
+                    $("#node-action-fetch_all").show();
+                }
+                else if (current_source == "submission") {
+                    $("#node-action-content_id").show();
+                    $("#node-action-fetch_all").show();
+
+                    if ($("#node-input-fetch_all").val() != "true") {
+                        $("#node-action-depth").show();
+                    }
+                }
+                else if (current_source == "id") {
+                    $("#node-action-content_id").show();
+                }
+                $("#node-action-comment_source").show()
+            }
+            else if (type == "pm") {
+                if (current_source == "inbox") {                
+                    $("#node-action-fetch_all").show();
+                }
+                else if (current_source == "id") {
+                    $("#node-action-content_id").show();
+                }
+                $("#node-action-pm_source").show()
+            } else if (type == "content") {
+                $("#node-action-content_source").show();
+            }
+
+            if ($("#node-input-fetch_all").val() != "true" && current_source != "id") {
+                $("#node-action-limit").show();
+            }
+        }
+        
+        $("#node-input-reddit").change(function() {
+            resetFetchAll()
+            hideExtraActions()
+            showActions()
+        });
+
+        $("#node-input-content_type").change(function() {
+            resetFetchAll()
+            hideExtraActions()
+            showActions()
+        });
+
+        $("#node-input-submission_source").change(function() {
+            resetFetchAll()
+            hideExtraActions()
+            showActions()
+        });
+
+        $("#node-input-comment_source").change(function() {
+            resetFetchAll()
+            hideExtraActions()
+            showActions()
+        });
+
+        $("#node-input-pm_source").change(function() {
+            resetFetchAll()
+            hideExtraActions()
+            showActions()
+        });
+
+        $("#node-input-user").keyup(function() {
+            resetFetchAll()
+            hideExtraActions()
+            showActions()
+        });
+
+        $("#node-input-fetch_all").change(function() {            
+            hideExtraActions()
+            showActions()
+        });
+
+        $("#node-input-sort").change(function() {   
+            hideExtraActions()
+            showActions()
+        });
+    }
+    
+
+    RED.nodes.registerType('get',{
+        category: 'reddit',
+        color: '#a6bbcf',
+        defaults: {
+            name: {value:""},
+            reddit: { type:"reddit-credentials",required:true},
+            content_type: {value:"submission"},
+            submission_source: {value:"subreddit"},
+            comment_source: {value:"subreddit"},
+            pm_source: {value:"inbox"},
+            content_source: {value:"saved"},
+            subreddit: {value:""},
+            user: {value:""},
+            limit: {value:""},
+            sort: {value:"hot"},
+            time: {value:"hour"},
+            fetch_all: {value:"false"},
+            submission: {value: ""},
+            depth: {value: ""},
+            content_id: {value: ""}
+        },
+        inputs:1,
+        outputs:1,
+        icon: "snoo2.png",
+        color:"#ffa27f",
+        label: function() {
+            var type = (this.content_type == "pm") ? "PM" : this.content_type;
+            var submission_source = this.submission_source;
+            var comment_source = this.comment_source;
+            var pm_source = this.pm_source;
+            var label; 
+            if ((type == "submission" && submission_source == "id") || (type == "comment" && comment_source == "id") || (type == "PM" && pm_source == "id") || (type == "content")) {
+                label = "get " + type;
+            }
+            else {
+                label = "get " + type + "s";
+            }
+
+            return this.name || label;
+        },
+        oneditprepare: oneditprepare
+    });
+</script>
+
+<script type="text/x-red" data-template-name="get">
+    <div class="form-row">
+        <label for="node-input-reddit"><i class="fa fa-reddit"></i> <span> credentials</span></label>
+        <input type="text" id="node-input-reddit">
+    </div>
+    <div class="form-row">
+        <label for="node-input-name"><i class="icon-tag"></i> name</label>
+        <input type="text" id="node-input-name" placeholder="name">
+    </div>
+    <hr>
+    <div class="form-row">
+        <label for="node-input-content_type"><i class="fa fa-wrench"></i> type</label>
+        <select type="text" id="node-input-content_type" style="display: inline-block; width: 250px; vertical-align: top;">
+            <option value="submission" outputs="1">submission</option>
+            <option value="comment" outputs="1">comment</option>
+            <option value="pm" outputs="1">PM</option>
+            <option value="content" outputs="1">content</option>
+        </select>
+    </div>
+    <div class="form-row" id="node-action-submission_source">
+        <label for="node-input-submission_source"><i class="fa fa-wrench"></i> source</label>
+        <select type="text" id="node-input-submission_source" style="display: inline-block; width: 250px; vertical-align: top;">
+            <option value="subreddit" outputs="1">subreddit</option>
+            <option value="user" outputs="1">user</option>
+            <option value="id" outputs="1">id</option>
+        </select>
+    </div>
+    <div class="form-row" id="node-action-comment_source">
+        <label for="node-input-comment_source"><i class="fa fa-wrench"></i> source</label>
+        <select type="text" id="node-input-comment_source" style="display: inline-block; width: 250px; vertical-align: top;">
+            <option value="subreddit" outputs="1">subreddit</option>
+            <option value="user" outputs="1">user</option>
+            <option value="submission" outputs="1">submission</option>
+            <option value="id" outputs="1">id</option>
+        </select>
+    </div>
+    <div class="form-row" id="node-action-pm_source">
+        <label for="node-input-pm_source"><i class="fa fa-wrench"></i> source</label>
+        <select type="text" id="node-input-pm_source" style="display: inline-block; width: 250px; vertical-align: top;">
+            <option value="inbox" outputs="1">inbox</option>
+            <option value="id" outputs="1">id</option>
+        </select>
+    </div>
+    <div class="form-row" id="node-action-content_source">
+        <label for="node-input-content_source"><i class="fa fa-wrench"></i> source</label>
+        <select type="text" id="node-input-content_source" style="display: inline-block; width: 250px; vertical-align: top;">
+            <option value="saved" outputs="1">saved</option>
+            <option value="upvoted" outputs="1">upvoted</option>
+            <option value="downvoted" outputs="1">downvoted</option>
+            <option value="gilded" outputs="1">gilded</option>
+            <option value="hidden" outputs="1">hidden</option>
+        </select>
+    </div>
+    <div class="form-row" id="node-action-subreddit">
+        <label for="node-input-subreddit"><i class="icon-tag"></i> subreddit</label>
+        <input type="text" id="node-input-subreddit" placeholder="subreddit">
+    </div>
+    <div class="form-row" id="node-action-user">
+        <label for="node-input-user"><i class="icon-tag"></i> user</label>
+        <input type="text" id="node-input-user" placeholder="user">
+    </div>
+    <div class="form-row" id="node-action-content_id">
+        <label for="node-input-content_id"><i class="icon-tag"></i> content_id</label>
+        <input type="text" id="node-input-content_id" placeholder="content_id">
+    </div>
+    <div class="form-row" id="node-action-sort"> 
+        <label for="node-input-sort"><i class="fa fa-wrench"></i> sort</label>
+        <select type="text" id="node-input-sort" style="display: inline-block; width: 250px; vertical-align: top;">
+            <option value="hot" outputs="1">hot</option>
+            <option value="new" outputs="1">new</option>
+            <option value="rising" outputs="1">rising</option>
+            <option value="controversial" outputs="1">controversial</option>
+            <option value="top" outputs="1">top</option>
+        </select>
+    </div>
+    <div class="form-row" id="node-action-time"> 
+        <label for="node-input-time"><i class="fa fa-wrench"></i> time</label>
+        <select type="text" id="node-input-time" style="display: inline-block; width: 250px; vertical-align: top;">
+            <option value="hour" outputs="1">hour</option>
+            <option value="day" outputs="1">day</option>
+            <option value="week" outputs="1">week</option>
+            <option value="month" outputs="1">month</option>
+            <option value="year" outputs="1">year</option>
+            <option value="all" outputs="1">all time</option>
+        </select>
+    </div>
+    <div class="form-row" id="node-action-fetch_all">
+        <label for="node-input-fetch_all"><i class="icon-tag"></i> fetch All</label>
+        <select type="text" id="node-input-fetch_all" style="display: inline-block; width: 250px; vertical-align: top;">
+            <option value="true" outputs="1">true</option>
+            <option value="false" outputs="1">false</option>
+        </select>
+    </div>
+    <div class="form-row" id="node-action-limit">
+        <label for="node-input-limit"><i class="icon-tag"></i> limit</label>
+        <input type="number" min="0" id="node-input-limit" placeholder="limit">
+    </div>
+    <div class="form-row" id="node-action-depth">
+        <label for="node-input-depth"><i class="icon-tag"></i> depth</label>
+        <input type="number" min="0" id="node-input-depth" placeholder="depth">
+    </div>    
+</script>
+
+<script type="text/x-red" data-help-name="get">
+    <p>Get Reddit submissions, comments, or PMs</p>
+    <p>This node will get submissions, comments, or personal messages from subreddits, users, your inbox or the listing’s id, according to its configuration.</p>
+    <h3>Inputs</h3>
+    <dl class="message-properties">
+        <dt>type
+            <span class="property-type">string</span>
+        </dt>
+        <dd> the type of content to be retrieved </dd>
+        <dt>source 
+            <span class="property-type">string</span>
+        </dt>
+        <dd> the source of the content</dd>
+        <dt class="optional">subreddit 
+            <span class="property-type">string</span>
+        </dt>
+        <dd> the subreddit from which submissions or comments will be retrieved</dd>
+        <dt class="optional">user 
+            <span class="property-type">string</span>
+        </dt>
+        <dd> the user who submitted the submissions or comments</dd>
+        <dt class="optional">content_id 
+            <span class="property-type">string</span>
+        </dt>
+        <dd> the id of the listing to be retrieved</dd>
+        <dt class="optional">sort 
+            <span class="property-type">string</span>
+        </dt>
+        <dd> the sorting method for the Reddit content</dd>
+        <dt class="optional">time 
+            <span class="property-type">string</span>
+        </dt>
+        <dd> the time range for the Reddit content</dd>
+        <dt class="optional">fetch_all
+            <span class="property-type">string</span>
+        </dt>
+        <dd> the option to retrieve all possible content</dd>
+        <dt class="optional">limit
+            <span class="property-type">number</span>
+        </dt>
+        <dd> the number of listings to be retrieved</dd>
+        <dt class="optional">depth
+            <span class="property-type">number</span>
+        </dt>
+        <dd> an upper bound for replies in the comment tree</dd>
+    </dl>
+
+    <h3>Outputs</h3>
+    <ol class="node-ports">
+        <li>Standard output
+            <dl class="message-properties">
+                <dt>payload <span class="property-type">object</span></dt>
+                <dd>the Snoowrap object representing the Reddit content</dd>
+            </dl>
+        </li>
+        <li>Standard error
+            <dl class="message-properties">
+                <dt>payload <span class="property-type">string</span></dt>
+                <dd>the standard error of the command.</dd>
+            </dl>
+        </li>
+    </ol>
+
+    <h3>Details</h3>
+    <h4>Prefixes</h4>
+    <p>Exclude the "r/" when entering a <code>subreddit</code> and the "u/" when entering a <code>user</code></p>
+    <h4>Populating fields</h4>
+    <p>All text input properties may be hardcoded via text or dynamically populated via mustache syntax relative to the incoming msg object.</p>
+    <p>For example, if the target <code>subreddit</code> is located in <code>msg.payload.target</code>, then you can fill in <code>{{payload.target}}</code> in the <code>subreddit</code> field.</p>
+    <h4>Comments</h4>
+    <p>When a subreddit is the source, the newest comments from the subreddit are retrieved.</p>
+    <p>When a submission is the source, a comment tree is retrieved, broken up by the parent comments. Replies to these comments, if any, will be in <code>msg.payload.replies</code>.</p>
+    <h4>Fetch all</h4>
+    <p>
+        The <code>fetch_all</code> property is only accessible when retrieving comments or submissions from a user, your own PMs, or comments from a submission. 
+        If set to <code>false</code>, the limit option will determine the number of listings to be retrieved. The Reddit API docs outline the rate limits. 
+    </p>
+
+    <h3>References</h3>
+    <ul>
+        <li><a href="https://www.reddit.com/dev/api/">Reddit API docs</a> - full description of the Reddit API</li>
+        <li><a href="https://not-an-aardvark.github.io/snoowrap/">Snoowrap docs</a> - information regarding the limit and depth properties</li>
+        <li><a href='https://github.com/jcostello93/node-red-contrib-node-reddit'>node-red-contrib-node-reddit</a> - the Node-Reddit github repository</li>
+    </ul>
+
+</script>
+<!-- END Get -->
+
+<!-- START Create -->
+<script type="text/javascript">
+    RED.nodes.registerType('create', {
+      category: 'reddit',
+      color: '#a6bbcf',
+      defaults: {
+        name: {value: ""},
+        reddit: { type: "reddit-credentials", required: true},
+        submissionType: {value: "self"},
+        subreddit: {value: ""},
+        title: {value: ""},
+        url: {value: ""},
+        text: {value: ""},
+        original: {value: ""},
+        recipient: {value: ""},
+        subject: {value: ""},
+        message: {value: ""},
+      },
+      inputs:1,
+      outputs:1,
+      icon: "snoo2.png",
+      color:"#ffa27f",
+      label: function() {
+        if (this.name) {
+          return this.name;
+        } else if (this.subreddit && this.subreddit.indexOf("{{") == -1) {
+          return "r/" + this.subreddit;
+        } else if (this.recipient && this.recipient.indexOf("{{") == -1) {
+          return "u/" + this.recipient;
+        } else {
+          return "create";
+        }
+      },
+      oneditprepare: () => {
+        $("#node-input-submissionType").change(() => {
+          $("#node-action-subreddit").hide();
+          $("#node-action-title").hide();
+          $("#node-action-text").hide();
+          $("#node-action-url").hide();
+          $("#node-action-original").hide();
+          $("#node-action-subject").hide();
+          $("#node-action-recipient").hide();
+          $("#node-action-message").hide();
+    
+          let type = $("#node-input-submissionType option:selected").val();
+  
+          if (type === "self") {
+            $("#node-action-subreddit").show();
+            $("#node-action-title").show();
+            $("#node-action-text").show();
+          } else if (type === "link") {
+            $("#node-action-subreddit").show();
+            $("#node-action-title").show();
+            $("#node-action-url").show();
+          } else if (type === "cross") {
+            $("#node-action-subreddit").show();
+            $("#node-action-title").show();
+            $("#node-action-original").show();
+          } else if (type === "pm") {
+            $("#node-action-recipient").show();
+            $("#node-action-subject").show();
+            $("#node-action-message").show();
+          }
+        });
+      },
+    });
+  </script>
+    
+  <script type="text/x-red" data-template-name="create">
+    <div class="form-row">
+      <label for="node-input-reddit"><i class="fa fa-reddit"></i>credentials</label>
+      <input type="text" id="node-input-reddit">
+    </div>
+    <div class="form-row">
+      <label for="node-input-name"><i class="icon-tag"></i>name</label>
+      <input type="text" id="node-input-name" placeholder="optional name for this node">
+    </div>
+    <hr>
+    <div class="form-row"> 
+      <label for="node-input-submissionType"><i class="fa fa-wrench"></i>type</label>
+      <select type="text" id="node-input-submissionType" style="display: inline-block; width: 250px; vertical-align: top;">
+        <option value="self" outputs="1">self-post</option>
+        <option value="link" outputs="1">link post</option>
+        <option value="cross" outputs="1">cross-post</option>
+        <option value="pm" outputs="1">private message</option>
+      </select>
+    </div>
+    <div class="form-row" id="node-action-subreddit">
+      <label for="node-input-subreddit"><i class="icon-tag"></i>subreddit</label>
+      <input type="text" id="node-input-subreddit" placeholder="subreddit name">
+    </div>
+    <div class="form-row" id="node-action-title">
+      <label for="node-input-title"><i class="icon-tag"></i>title</label>
+      <input type="text" id="node-input-title" placeholder="post title">
+    </div>
+    <div class="form-row" id="node-action-text">
+      <label for="node-input-text"><i class="icon-tag"></i>text</label>
+      <input type="text" id="node-input-text" placeholder="content">
+    </div>
+    <div class="form-row" id="node-action-url">
+      <label for="node-input-url"><i class="icon-tag"></i>url</label>
+      <input type="text" id="node-input-url" placeholder="url to link">
+    </div>
+    <div class="form-row" id="node-action-original">
+      <label for="node-input-original"><i class="icon-tag"></i>original</label>
+      <input type="text" id="node-input-original" placeholder="original submission id">
+    </div>
+    <div class="form-row" id="node-action-recipient">
+      <label for="node-input-recipient"><i class="icon-tag"></i>to</label>
+      <input type="text" id="node-input-recipient" placeholder="recipient's username">
+    </div>
+    <div class="form-row" id="node-action-subject">
+      <label for="node-input-subject"><i class="icon-tag"></i>subject</label>
+      <input type="text" id="node-input-subject" placeholder="message subject">
+    </div>
+    <div class="form-row" id="node-action-message">
+      <label for="node-input-message"><i class="icon-tag"></i>message</label>
+      <input type="text" id="node-input-message" placeholder="message">
+    </div>
+  </script>
+  
+  <script type="text/x-red" data-help-name="create">
+    <p>Create a new Reddit submission or PM.</p>
+  
+    <h3>Inputs</h3>
+      <dl class="message-properties">
+        <dt>type <span class="property-type">selection</span></dt>
+        <dd> choose self-, link-,  or cross-post, or PM.</dd>
+        <hr>
+        &nbsp;<b>For Submissions:</b>
+        <dt>subreddit <span class="property-type">string</span></dt>
+        <dd> the subreddit to submit to.</dd>
+        <dt>title <span class="property-type">string</span></dt>
+        <dd> the title of the submission.</dd>
+        <dt>  - text <span class="property-type">string</span></dt>
+        <dd>     the text of a self-post.</dd>
+        <dt>  - url <span class="property-type">string</span></dt>
+        <dd>     the url of a link-post.</dd>
+        <dt>  - original <span class="property-type">string</span></dt>
+        <dd>     the original listing name for a cross-post.</dd>
+        <hr>
+        &nbsp;<b>For PMs:</b>
+        <dt>recipient <span class="property-type">string</span></dt>
+        <dd> the recipient of the PM.</dd>
+        <dt>subject <span class="property-type">string</span></dt>
+        <dd> the subject of the PM.</dd>
+        <dt>message <span class="property-type">string</span></dt>
+        <dd> the mesage of a PM.</dd>
+      </dl>
+  
+    <h3>Outputs</h3>
+      <ol class="node-ports">
+        <li>Standard output
+          <dl class="message-properties">
+            <dt>payload <span class="property-type">object</span></dt>
+            <dd> the name of the new submission listing.</dd>
+          </dl>
+        </li>
+        <li>Standard error
+          <dl class="message-properties">
+            <dt>payload <span class="property-type">string</span></dt>
+            <dd>the standard error of the command.</dd>
+           </dl>
+        </li>
+      </ol>
+  
+    <h3>Details</h3>
+      <p>Exclude the "r/" when entering your <code>subreddit</code>. "r/<code>subreddit</code>" will be 
+      used for the display name if <code>name</code> is left empty.
+      </p>
+      <p>Exclude the "u/" when entering your <code>recipient</code>. "u/<code>recipient</code>" will be
+      used for the display name if <code>name</code> is left empty.
+      </p>
+      <p>
+      Properties can also be set using mustache syntax of the <code>msg.payload</code>. 
+      </p>
+  
+    <h3>References</h3>
+      <ul>
+        <li><a href='https://www.reddit.com/dev/api/'>Reddit API docs</a> - descriptions of the 3 submission types</li>
+        <li><a href='https://github.com/jcostello93/node-red-contrib-node-reddit'>node-red-contrib-node-reddit</a> - the Node-Reddit github repository</li>
+      </ul>
+  </script>
+<!-- END Create  -->
+
+<!-- START Reply -->
+<script type="text/javascript">
+    RED.nodes.registerType('reply',{
+        category: 'reddit',
+        color: '#a6bbcf',
+        defaults: {
+            name: {value:""},
+            reddit: { type:"reddit-credentials",required:true},
+            content_type: {value:"submission"},
+            content_id: {value:""},
+            text: {value:""}
+        },
+        inputs:1,
+        outputs:1,
+        align: "left",
+        icon: "snoo2.png",
+        color:"#ffa27f",
+        label: function() {
+            return this.name||"reply";
+        }
+    });
+</script>
+
+<script type="text/x-red" data-template-name="reply">
+    <div class="form-row">
+        <label for="node-input-reddit"><i class="fa fa-key"></i> <span> credentials</span></label>
+        <input type="text" id="node-input-reddit">
+    </div>
+    <div class="form-row">
+        <label for="node-input-name"><i class="icon-tag"></i> name</label>
+        <input type="text" id="node-input-name" placeholder="name">
+    </div>
+    <hr>
+    <div class="form-row">
+        <label for="node-input-content_type"><i class="fa fa-wrench"></i> type</label>
+        <select type="text" id="node-input-content_type" style="display: inline-block; width: 250px; vertical-align: top;">
+            <option value="submission" outputs="1">submission</option>
+            <option value="comment" outputs="1">comment</option>
+            <option value="pm" outputs="1">PM</option>
+        </select>
+    </div>
+    <div class="form-row">
+        <label for="node-input-content_id"><i class="icon-tag"></i> content_id</label>
+        <input type="text" id="node-input-content_id" placeholder="content_id">
+    </div>
+    <div class="form-row">
+        <label for="node-input-text"><i class="icon-tag"></i> text</label>
+        <input type="text" id="node-input-text" placeholder="text">
+    </div>
+</script>
+
+<script type="text/x-red" data-help-name="reply">
+    <p>Reply to Reddit submissions, comments, or PMs</p>
+    <p>This node will reply to submission, comment, or personal message, identified by its Reddit content id.</p>
+    <h3>Inputs</h3>
+    <dl class="message-properties">
+        <dt>type
+            <span class="property-type">string</span>
+        </dt>
+        <dd> the type of content to be replied to </dd>
+        <dt>content_id
+            <span class="property-type">string</span>
+        </dt>
+        <dd> the id of the Reddit content to be replied to</dd>
+        <dt>text
+            <span class="property-type">string</span>
+        </dt>
+        <dd> the body of the response </dd>
+    </dl>
+
+    <h3>Outputs</h3>
+    <ol class="node-ports">
+        <li>Standard output
+            <dl class="message-properties">
+                <dt>payload <span class="property-type">object</span></dt>
+                <dd>the Snoowrap object representing the Reddit content</dd>
+            </dl>
+        </li>
+        <li>Standard error
+            <dl class="message-properties">
+                <dt>payload <span class="property-type">string</span></dt>
+                <dd>the standard error of the command.</dd>
+            </dl>
+        </li>
+    </ol>
+
+    <h3>Details</h3>
+    <h4>Populating fields</h4>
+    <p><code>content_id</code> and <code>text</code> may be hardcoded via text or dynamically populated via mustache syntax relative to the incoming msg object.</p>
+    <p>For example, if the target <code>content_id</code> is located in <code>msg.payload.target</code>, then you can fill in <code>{{payload.target}}</code> in the <code>content_id</code> field.</p>
+    <h3>References</h3>
+    <ul>
+        <li><a href="https://www.reddit.com/dev/api/">Reddit API docs</a> - full description of the Reddit API</li>
+        <li><a href='https://github.com/jcostello93/node-red-contrib-node-reddit'>node-red-contrib-node-reddit</a> - the Node-Reddit github repository</li>
+    </ul>
+</script>
+<!-- END Reply -->
+
+
+<!-- START Search -->
+<script type="text/javascript">
+    RED.nodes.registerType('search',{
+        category: 'reddit',
+        color: '#a6bbcf',
+        defaults: {
+            name: {value:""},
+            reddit: { type:"reddit-credentials",required:true},
+            subreddit: {value:"", required:true},
+            query: {value:"", required:true},
+            time: {value:"hour"},
+            sort: {value:"relevance"}
+        },
+        inputs:1,
+        outputs:1,
+        icon: "snoo2.png",
+        color:"#ffa27f",
+        label: function() {
+            return this.name||"search";
+        }
+    });
+</script>
+
+<script type="text/x-red" data-template-name="search">
+    <div class="form-row">
+        <label for="node-input-reddit"><i class="fa fa-key"></i> <span>credentials</span></label>
+        <input type="text" id="node-input-reddit">
+    </div>
+    <div class="form-row">
+        <label for="node-input-name"><i class="icon-tag"></i> name</label>
+        <input type="text" id="node-input-name" placeholder="name">
+    </div>
+    <hr>
+    <div class="form-row">
+        <label for="node-input-subreddit"><i class="icon-tag"></i> subreddit</label>
+        <input type="text" id="node-input-subreddit" placeholder="subreddit">
+    </div>
+    <div class="form-row">
+        <label for="node-input-query"><i class="icon-tag"></i> query</label>
+        <input type="text" id="node-input-query" placeholder="query">
+    </div>
+    <div class="form-row" id="node-action-time"> 
+        <label for="node-input-time"><i class="fa fa-wrench"></i> time</label>
+        <select type="text" id="node-input-time" style="display: inline-block; width: 250px; vertical-align: top;">
+            <option value="hour" outputs="1">hour</option>
+            <option value="day" outputs="1">day</option>
+            <option value="week" outputs="1">week</option>
+            <option value="month" outputs="1">month</option>
+            <option value="year" outputs="1">year</option>
+            <option value="all" outputs="1">all time</option>
+        </select>
+    </div>
+    <div class="form-row" id="node-action-sort"> 
+        <label for="node-input-sort"><i class="fa fa-wrench"></i> sort</label>
+        <select type="text" id="node-input-sort" style="display: inline-block; width: 250px; vertical-align: top;">
+            <option value="relevance" outputs="1">relevance</option>
+            <option value="hot" outputs="1">hot</option>
+            <option value="new" outputs="1">new</option>
+            <option value="comments" outputs="1">comments</option>
+            <option value="top" outputs="1">top</option>
+        </select>
+    </div>
+</script>
+
+<script type="text/x-red" data-help-name="search">
+    <p>Search Reddit</p>
+    <p>This node will perform a Reddit search query in a subreddit.</p>
+    <h3>Inputs</h3>
+    <dl class="message-properties">
+        <dt>subreddit
+            <span class="property-type">string</span>
+        </dt>
+        <dd> the subreddit to be searched </dd>
+        <dt>query
+            <span class="property-type">string</span>
+        </dt>
+        <dd> the search query</dd>
+        <dt>time
+            <span class="property-type">string</span>
+        </dt>
+        <dd> the time range of the search results </dd>
+        <dt>sort
+            <span class="property-type">string</span>
+        </dt>
+        <dd> the sort filter for the results </dd>
+    </dl>
+
+    <h3>Outputs</h3>
+    <ol class="node-ports">
+        <li>Standard output
+            <dl class="message-properties">
+                <dt>payload <span class="property-type">object</span></dt>
+                <dd>the Snoowrap object representing the Reddit content</dd>
+            </dl>
+        </li>
+        <li>Standard error
+            <dl class="message-properties">
+                <dt>payload <span class="property-type">string</span></dt>
+                <dd>the standard error of the command.</dd>
+            </dl>
+        </li>
+    </ol>
+
+    <h3>Details</h3>
+    <h4>Prefixes</h4>
+    <p>Exclude the "r/" when entering a <code>subreddit</code> and the "u/" when entering a <code>user</code></p>
+    <h4>Populating fields</h4>
+    <p><code>content_id</code> and <code>text</code> may be hardcoded via text or dynamically populated via mustache syntax relative to the incoming msg object.</p>
+    <p>For example, if the target <code>query</code> is located in <code>msg.payload.target</code>, then you can fill in <code>{{payload.target}}</code> in the <code>query</code> field.</p>
+    <h3>References</h3>
+    <ul>
+        <li><a href="https://www.reddit.com/wiki/search">Reddit search wiki</a> - information regarding search fields and syntax</li>
+        <li><a href='https://github.com/jcostello93/node-red-contrib-node-reddit'>node-red-contrib-node-reddit</a> - the Node-Reddit github repository</li>
+    </ul>
+</script>
+<!-- END Search -->
+
+<!-- START Edit -->
+<script type="text/javascript">
+    RED.nodes.registerType('edit',{
+        category: 'reddit',
+        color: '#a6bbcf',
+        defaults: {
+            name: {value:""},
+            reddit: { type:"reddit-credentials",required:true},
+			content_type: {value:"submission"},
+			edit_content: {value:""},
+			content_id: {value:""}
+        },
+        inputs:1,
+        outputs:1,
+        icon: "snoo2.png",
+        color:"#ffa27f",
+        label: function() {
+            return this.name||"edit";
+        }
+    });
+</script>
+
+<script type="text/x-red" data-template-name="edit">
+    <div class="form-row">
+        <label for="node-input-reddit"><i class="fa fa-reddit"></i> <span>Credentials</span></label>
+        <input type="text" id="node-input-reddit">
+    </div>
+    <div class="form-row">
+        <label for="node-input-name"><i class="icon-tag"></i> Name</label>
+        <input type="text" id="node-input-name" placeholder="Optional name for this node">
+    </div>
+    <hr>
+    <div class="form-row">
+        <label for="node-input-content_type"><i class="fa fa-wrench"></i>Type</label>
+        <select type="text" id="node-input-content_type">
+			<option value="submission" outputs="1">Submission</option>
+			<option value="comment" outputs="1">Comment</option>
+        </select>
+    </div>
+	<div class="form-row" id="node-action-content_id">
+        <label for="node-input-content_id"><i class="icon-tag"></i> Content id</label>
+        <input type="text" id="node-input-content_id" placeholder="content_id">
+    </div>
+    <div class="form-row">
+		<label for="node-input-edit_content"><i class="icon-tag"></i>Text</label>
+		<input type="text" id="node-input-edit_content" placeholder="Type new contents here.">
+	</div>
+</script>
+
+<script type="text/x-red" data-help-name="edit">
+    <p>Edit a Reddit submission or comment.</p>
+	<p>Content id, content type selection, and new contents are required.</p>
+	
+	
+	<h3>Inputs</h3>
+    <dl class="message-properties">
+        <dt>content_id
+            <span class="property-type">string</span>
+        </dt>
+        <dd> the Reddit id of the content to be edited. </dd>
+		<dt>type
+            <span class="property-type">string</span>
+        </dt>
+        <dd> the type of the content to be edited. </dd>
+        <dt>text<span class="property-type">string</span></dt>
+        <dd> the edited content. </dd>
+    </dl>
+	
+	
+	<h3>Outputs</h3>
+    <ol class="node-ports">
+         <li>Standard output
+             <dl class="message-properties">
+                 <dt>payload <span class="property-type">string</span></dt>
+                 <dd>the edited Reddit content</dd>
+             </dl>
+         </li>
+         <li>Standard error
+             <dl class="message-properties">
+                 <dt>payload <span class="property-type">string</span></dt>
+                 <dd>the standard error of the command.</dd>
+             </dl>
+         </li>
+     </ol>
+	 
+	 
+    <h3>Details</h3>
+    <p>You can only edit your own Reddit content.</p>
+    <h4>Populating fields</h4>
+    <p>All text input properties may be hardcoded via text or dynamically populated via mustache syntax relative to the incoming msg object.</p>
+    <p>For example, if the target <code>content_id</code> is located in <code>msg.payload.target</code>, then you can fill in <code>{{payload.target}}</code> in the <code>content_id</code> field.</p>
+		
+		
+	<h3>References</h3>
+		<ul>
+			<li><a href="https://www.reddit.com/dev/api/">Reddit API docs</a> - full description of reddit API</li>
+			<li><a href="https://not-an-aardvark.github.io/snoowrap/">Snoowrap API</a> - information about Snoowrap API used for this node.</li>
+            <li><a href='https://github.com/jcostello93/node-red-contrib-node-reddit'>node-red-contrib-node-reddit</a> - the Node-Reddit github repository</li>
+		</ul>
+</script>
+<!-- END Edit -->
+
+<!-- START Delete -->
+<script type="text/javascript">
+    RED.nodes.registerType('delete',{
+        category: 'reddit',
+        color: '#a6bbcf',
+        defaults: {
+            name: {value:""},
+            reddit: { type:"reddit-credentials",required:true},
+			content_type: {value:"submission"},
+			content_id: {value:""}
+        },
+        inputs:1,
+        outputs:0,
+        icon: "snoo2.png",
+        color:"#ffa27f",
+        label: function() {
+            return this.name||"delete";
+        }
+    });
+</script>
+
+<script type="text/x-red" data-template-name="delete">
+    <div class="form-row">
+        <label for="node-input-reddit"><i class="fa fa-reddit"></i> <span>Credentials</span></label>
+        <input type="text" id="node-input-reddit">
+    </div>
+    <div class="form-row">
+        <label for="node-input-name"><i class="icon-tag"></i> Name</label>
+        <input type="text" id="node-input-name" placeholder="Optional name for this node">
+    </div>
+    <hr>
+    <div class="form-row">
+        <label for="node-input-content_type"><i class="fa fa-wrench"></i>Type</label>
+        <select type="text" id="node-input-content_type">
+            <option value="submission" outputs="1">Submission</option>
+            <option value="comment" outputs="1">Comment</option>
+			<option value="private_message" outputs="1">Private Message</option>
+        </select>
+    </div>
+	<div class="form-row" id="node-action-content_id">
+        <label for="node-input-content_id"><i class="icon-tag"></i> Content id</label>
+        <input type="text" id="node-input-content_id" placeholder="content_id">
+    </div>
+</script>
+
+<script type="text/x-red" data-help-name="delete">
+    <p>Delete a Reddit submission, comment, or PM.</p>
+	<p>Content id, and content type selection are required.</p>
+	
+	
+	<h3>Inputs</h3>
+    <dl class="message-properties">
+        <dt>content_id
+            <span class="property-type">string</span>
+        </dt>
+        <dd> the Reddit id of the content to be deleted. </dd>
+		<dt>type
+            <span class="property-type">string</span>
+        </dt>
+        <dd> the type of the content to be deleted. </dd>
+    </dl>
+	
+	
+	<h3>Outputs</h3>
+    <ol class="node-ports">
+         <li>This node has 0 outputs.
+         </li>
+         <li>Standard error
+             <dl class="message-properties">
+                 <dt>payload <span class="property-type">string</span></dt>
+                 <dd>the standard error of the command.</dd>
+             </dl>
+         </li>  
+    </ol>
+	 
+	 
+	<h3>Details</h3>
+    <p>You can only delete your own Reddit content.</p>
+    <h4>Populating fields</h4>
+    <p>All text input properties may be hardcoded via text or dynamically populated via mustache syntax relative to the incoming msg object.</p>
+    <p>For example, if the target <code>content_id</code> is located in <code>msg.payload.target</code>, then you can fill in <code>{{payload.target}}</code> in the <code>content_id</code> field.</p>
+    	
+	
+	<h3>References</h3>
+		<ul>
+			<li><a href="https://www.reddit.com/dev/api/">Reddit API docs</a> - full description of reddit API</li>
+			<li><a href="https://not-an-aardvark.github.io/snoowrap/">Snoowrap API</a> - information about Snoowrap API used for this node.</li>
+            <li><a href='https://github.com/jcostello93/node-red-contrib-node-reddit'>node-red-contrib-node-reddit</a> - the Node-Reddit github repository</li>
+		</ul>
+	
+</script>
+<!-- END Delete -->
+
+<!-- START React -->
+<script type="text/javascript">
+    RED.nodes.registerType('react',{
+        category: 'reddit',
+        color: '#a6bbcf',
+        defaults: {
+            name: {value:""},
+            reddit: { type:"reddit-credentials",required:true},
+			content_type: {value:"submission"},
+			content_id: {value:""},
+            vote: { value: ""},
+			save: {value: ""},
+            gild: { value: ""},
+			report: {value: ""}
+        },
+        inputs:1,
+        outputs:0,
+        icon: "snoo2.png",
+        color:"#ffa27f",
+        label: function() {
+            return this.name||"react";
+        }
+    });
+</script>
+
+<script type="text/x-red" data-template-name="react">
+    <div class="form-row">
+        <label for="node-input-reddit"><i class="fa fa-reddit"></i> <span>Credentials</span></label>
+        <input type="text" id="node-input-reddit">
+    </div>
+    <div class="form-row">
+        <label for="node-input-name"><i class="icon-tag"></i> Name</label>
+        <input type="text" id="node-input-name" placeholder="Optional name for this node">
+    </div>
+    <hr>
+    <div class="form-row">
+        <label for="node-input-content_type"><i class="fa fa-wrench"></i>Type</label>
+        <select type="text" id="node-input-content_type">
+            <option value="submission" outputs="1">Submission</option>
+            <option value="comment" outputs="1">Comment</option>
+        </select>
+    </div>
+	<div class="form-row" id="node-action-content_id">
+        <label for="node-input-content_id"><i class="icon-tag"></i> Content id</label>
+        <input type="text" id="node-input-content_id" placeholder="content_id">
+    </div>
+    <div class="form-row">
+        <label for="node-input-vote"><i class="fa fa-wrench"></i> Vote</label>
+        <select type="text" id="node-input-vote">
+            <option value="upvote" outputs="1">Upvote</option>
+            <option value="downvote" outputs="1">Downvote</option>
+            <option value="unvote" outputs="1">Un-vote</option>
+            <option value="none" outputs="1">None</option>
+        </select>
+    </div>
+    <div class="form-row">
+        <label for="node-input-save"><i class="fa fa-wrench"></i> Save</label>
+        <select type="text" id="node-input-save">
+            <option value="save" outputs="1">Save</option>
+            <option value="unsave" outputs="1">Unsave</option>
+            <option value="none" outputs="1">None</option>
+        </select>
+    </div>
+</script>
+
+
+<script type="text/x-red" data-help-name="react">
+    <p>React to a Reddit submission or comment.</p>
+	<p>Content id, and content type selection are required.</p>
+	
+	
+	<h3>Inputs</h3>
+    <dl class="message-properties">
+        <dt>content_id
+            <span class="property-type">string | buffer</span>
+        </dt>
+        <dd> the Reddit id of the content. </dd>
+		<dt>type
+            <span class="property-type">string | buffer</span>
+        </dt>
+        <dd> the type of the content. </dd>
+    </dl>
+	
+	
+	<h3>Outputs</h3>
+    <ol class="node-ports">
+         <li>This node has 0 outputs. 
+         </li>
+         <li>Standard error
+             <dl class="message-properties">
+                 <dt>payload <span class="property-type">string</span></dt>
+                 <dd>the standard error of the command.</dd>
+             </dl>
+         </li>
+    </ol>	
+	
+	<h3>Details</h3>
+    <h4>Populating fields</h4>
+    <p>All text input properties may be hardcoded via text or dynamically populated via mustache syntax relative to the incoming msg object.</p>
+    <p>For example, if the target <code>content_id</code> is located in <code>msg.payload.target</code>, then you can fill in <code>{{payload.target}}</code> in the <code>content_id</code> field.</p>
+    
+	<h3>References</h3>
+		<ul>
+			<li><a href="https://www.reddit.com/dev/api/">Reddit API docs</a> - full description of reddit API</li>
+			<li><a href="https://not-an-aardvark.github.io/snoowrap/">Snoowrap API</a> - information about Snoowrap API used for this node.</li>
+            <li><a href='https://github.com/jcostello93/node-red-contrib-node-reddit'>node-red-contrib-node-reddit</a> - the Node-Reddit github repository</li>
+		</ul>
+</script>
+<!-- START React -->
