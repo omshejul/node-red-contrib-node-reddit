@@ -94,7 +94,7 @@ module.exports = function(RED) {
 			node.status({fill:"blue",shape:"dot",text:"loading"});
 
 			var content_type = n.content_type;
-			var subreddit = parseField(msg, n.subreddit);
+			var subreddit = msg.subreddit || parseField(msg, n.subreddit);
 			var user =  parseField(msg, n.user);
 			var submission_source = n.submission_source;
 			var comment_source = n.comment_source;
